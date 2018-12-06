@@ -57,7 +57,7 @@ SELECT pi.name posmName ,
        IFNULL(psi.posmItemsCount, 0) * (SELECT SUM(posmSetsCount) setsCountSum
                                         FROM placeposmtask
                                         WHERE status = 1) AS itemSumNeedToPlace,
-       IFNULL(psi.posmItemsCount, 0)) * (SELECT SUM(posmSetsCount) setsCountSum
+       IFNULL(psi.posmItemsCount, 0) * (SELECT SUM(posmSetsCount) setsCountSum
                                          FROM placeposmtask
                                          WHERE status = 2) AS itemSumPlaced
 FROM placeposmtask ppt
