@@ -5,7 +5,7 @@ USE merchandising;
 SELECT CONCAT(lastName,' ',firstName,' ', middleName) fullName, c.name cityName
 FROM merchandiser m
 INNER JOIN city c
-	  ON c.id = m.cityId
+	    ON c.id = m.cityId
 WHERE c.regionId = 3;
 
 -- 2)	Выведите информацию о POSm, у которых не задан комментарий
@@ -29,85 +29,102 @@ GROUP BY name;
 SELECT r.name regionName, COUNT(m.id) merchandisersCount
 FROM  region r
 LEFT JOIN city c
-	  ON c.regionId = r.id
+	   ON c.regionId = r.id
 LEFT JOIN merchandiser m
-	  ON c.id = m.cityId
+	   ON c.id = m.cityId
 GROUP BY r.name
 ORDER BY r.name;
 
 -- 5)	Посчитайте сколько единиц каждого вида POSm было суммарно отправлено в пункты продаж
 
-SELECT pi.name,
-       IF(psi.posmItemsCount IS NULL, 0, psi.posmItemsCount) *
-                              (SELECT SUM(posmSetsCount) setsCountSum
-                               FROM placeposmtask) AS itemSumSent
-FROM posmsetitem psi
+SELECT pi.name posmName,
+       IFNULL(psi.posmItemsCount, 0) * (SELECT SUM(posmSetsCount) setsCountSum
+                                        FROM placeposmtask) AS itemSumSent
+FROM placeposmtask ppt
+INNER JOIN formposmsettask f
+	  ON f.id = ppt.formPosmSetTaskId
+INNER JOIN posmset ps
+	ON ps.id = f.posmSetId
+INNER JOIN posmsetitem psi
+	ON psi.posmSetId = ps.id
 RIGHT JOIN posmitem pi
 	  ON pi.id = psi.posmItemId
-;
+GROUP BY pi.name;
 
 -- 6)	Посчитайте сколько единиц каждого вида POsm еще осталось разместить и сколько было размещено
 
-SELECT pi.name,
-       IF(psi.posmItemsCount IS NULL, 0, psi.posmItemsCount) *
-                               (SELECT SUM(posmSetsCount) setsCountSum
-                                FROM placeposmtask
-                                WHERE status = 1) AS itemSumNeedToPlace,
-       IF(psi.posmItemsCount IS NULL, 0, psi.posmItemsCount) *
-                               (SELECT SUM(posmSetsCount) setsCountSum
-                                FROM placeposmtask
-                                WHERE status = 2) AS itemSumPlaced
-FROM posmsetitem psi
+SELECT pi.name posmName ,
+       IFNULL(psi.posmItemsCount, 0) * (SELECT SUM(posmSetsCount) setsCountSum
+                                        FROM placeposmtask
+                                        WHERE status = 1) AS itemSumNeedToPlace,
+       IFNULL(psi.posmItemsCount, 0)) * (SELECT SUM(posmSetsCount) setsCountSum
+                                         FROM placeposmtask
+                                         WHERE status = 2) AS itemSumPlaced
+FROM placeposmtask ppt
+INNER JOIN formposmsettask f
+	  ON f.id = ppt.formPosmSetTaskId
+INNER JOIN posmset ps
+	ON ps.id = f.posmSetId
+INNER JOIN posmsetitem psi
+	ON psi.posmSetId = ps.id
 RIGHT JOIN posmitem pi
 	  ON pi.id = psi.posmItemId
-;
+GROUP BY pi.name;
 
 -- 7)	Посчитайте сколько единиц каждого вида POSm было отправлено каждому агенту
 
 SELECT agentCode,
        pi.name posmName,
-       IF(SUM(ppt.posmSetsCount * psi.posmItemsCount) IS NULL, 0, SUM(ppt.posmSetsCount * psi.posmItemsCount)) itemCountSentToAgent
+       IFNULL(SUM(ppt.posmSetsCount * psi.posmItemsCount), 0) itemCountSentToAgent
 FROM placeposmtask ppt
+INNER JOIN formposmsettask f
+	  ON f.id = ppt.formPosmSetTaskId
+INNER JOIN posmset ps
+	ON ps.id = f.posmSetId
 INNER JOIN posmsetitem psi
+	ON psi.posmSetId = ps.id
 RIGHT JOIN posmitem pi
-	    ON pi.id = psi.posmItemId
+	  ON pi.id = psi.posmItemId
 GROUP BY agentCode, pi.name
-ORDER BY agentCode
-;
+ORDER BY agentCode;
 
 -- 8)	Посчитайте сколько у каждого мерчендайзера задач «в работе» и «выполнено». Если 0, то должно вывестись 0
 
-SELECT CONCAT(lastName,' ',firstName,' ', middleName) fullName,
-       IF(status IS NULL,'задач нет',IF(status = 1,'в работе','выполнена')) taskStatus,
-       IF(SUM(ppt.posmSetsCount) IS NULL, 0, SUM(ppt.posmSetsCount)) tasksCount
+SELECT m.id, CONCAT(lastName,' ', firstName,' ', middleName) fullName,
+       IFNULL(IF(status = 1,'в работе','выполнена'), 'задач нет') taskStatus,
+       IFNULL(SUM(ppt.posmSetsCount), 0) tasksCount
 FROM placeposmtask ppt
 RIGHT JOIN merchandiser m
 	    ON ppt.merchandiserId = m.id
-GROUP BY status, CONCAT(lastName,' ',firstName,' ', middleName)
-ORDER BY lastName
+GROUP BY status, m.id, CONCAT(lastName,' ', firstName,' ', middleName)
+ORDER BY m.id
 ;
 -- 9)	Посчитайте сколько единиц каждого вида POSm было отправлено в каждый регион
 
 SELECT r.name regionName,
        pi.name posmName,
-       IF(SUM(ppt.posmSetsCount)IS NOT NULL, SUM(ppt.posmSetsCount) * psi.posmItemsCount, 0) itemCountSent
-FROM placeposmtask ppt
+       IFNULL(SUM(ppt.posmSetsCount) * psi.posmItemsCount, 0) itemCountSent
+FROM region r
 LEFT JOIN city c
-	   ON c.id = ppt.cityId
-RIGHT JOIN region r
 	   ON c.regionId = r.id
-INNER JOIN posmsetitem psi
-RIGHT JOIN posmitem pi
+LEFT JOIN placeposmtask ppt
+	   ON c.id = ppt.cityId
+LEFT JOIN formposmsettask f
+	   ON f.id = ppt.formPosmSetTaskId
+LEFT JOIN posmset ps
+	   ON ps.id = f.posmSetId
+LEFT JOIN posmsetitem psi
+	   ON psi.posmSetId = ps.id
+INNER JOIN posmitem pi
 	   ON pi.id = psi.posmItemId
 GROUP BY r.name, pi.name
-ORDER BY r.name
-;
+ORDER BY r.name;
 
 -- 10)	Найдите агентов, у которых более 2 задач на размещение, выведите для каждого из них количество задач
 
-SELECT merchandiserId, COUNT(posmSetsCount) taskCount
+SELECT agentCode, COUNT(posmSetsCount) taskCount
 FROM placeposmtask
 WHERE status = 1
-GROUP BY merchandiserId
+GROUP BY agentCode
 HAVING COUNT(posmSetsCount) > 2
 ;
