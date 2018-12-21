@@ -38,8 +38,7 @@ ORDER BY r.name;
 -- 5)	Посчитайте сколько единиц каждого вида POSm было суммарно отправлено в пункты продаж
 
 SELECT pi.name posmName,
-       IFNULL(psi.posmItemsCount, 0) * (SELECT SUM(posmSetsCount) setsCountSum
-                                        FROM placeposmtask) AS itemSumSent
+       IFNULL(SUM(ppt.posmSetsCount * psi.posmItemsCount), 0) itemSumSent
 FROM placeposmtask ppt
 INNER JOIN formposmsettask f
 	  ON f.id = ppt.formPosmSetTaskId
@@ -53,23 +52,20 @@ GROUP BY pi.name;
 
 -- 6)	Посчитайте сколько единиц каждого вида POsm еще осталось разместить и сколько было размещено
 
-SELECT pi.name posmName ,
-       IFNULL(psi.posmItemsCount, 0) * (SELECT SUM(posmSetsCount) setsCountSum
-                                        FROM placeposmtask
-                                        WHERE status = 1) AS itemSumNeedToPlace,
-       IFNULL(psi.posmItemsCount, 0) * (SELECT SUM(posmSetsCount) setsCountSum
-                                         FROM placeposmtask
-                                         WHERE status = 2) AS itemSumPlaced
+USE  merchandising;
+
+SELECT  pi.name, IFNULL(ppt.status,'не имеет статуса') TaskStatus, 
+        IFNULL(SUM(ppt.posmSetsCount * psi.posmItemsCount), 0) SumItems
 FROM placeposmtask ppt
 INNER JOIN formposmsettask f
-	  ON f.id = ppt.formPosmSetTaskId
-INNER JOIN posmset ps
+	ON f.id = ppt.formPosmSetTaskId
+INNER JOIN posmset ps	
 	ON ps.id = f.posmSetId
-INNER JOIN posmsetitem psi
+INNER JOIN posmsetitem 
 	ON psi.posmSetId = ps.id
-RIGHT JOIN posmitem pi
-	  ON pi.id = psi.posmItemId
-GROUP BY pi.name;
+RIGHT JOIN posmitem pi	 
+        ON pi.id = psi.posmItemId
+GROUP BY pi.name, ppt.status ;
 
 -- 7)	Посчитайте сколько единиц каждого вида POSm было отправлено каждому агенту
 
@@ -103,7 +99,7 @@ ORDER BY m.id
 
 SELECT r.name regionName,
        pi.name posmName,
-       IFNULL(SUM(ppt.posmSetsCount) * psi.posmItemsCount, 0) itemCountSent
+       IFNULL(SUM(ppt.posmSetsCount * psi.posmItemsCount), 0) itemCountSent
 FROM region r
 LEFT JOIN city c
 	   ON c.regionId = r.id
@@ -124,7 +120,6 @@ ORDER BY r.name;
 
 SELECT agentCode, COUNT(posmSetsCount) taskCount
 FROM placeposmtask
-WHERE status = 1
 GROUP BY agentCode
 HAVING COUNT(posmSetsCount) > 2
 ;
